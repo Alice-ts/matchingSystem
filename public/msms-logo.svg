@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="240" viewBox="0 0 800 240" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e2e8f0;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;600&amp;display=swap');
+    .text {
+      font-family: 'Montserrat', sans-serif;
+      fill: #e2e8f0;
+    }
+    .highlight {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 600;
+      fill: url(#textGradient);
+      filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.2));
+    }
+    .subtext {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 48px;
+      font-weight: 300;
+      fill: #a0aec0;
+      letter-spacing: 0.05em;
+    }
+    .author {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 16px;
+      font-weight: 300;
+      fill: #718096;
+      letter-spacing: 0.05em;
+    }
+  </style>
+  <g>
+    <!-- Main letters M and S -->
+    <text x="40" y="140" class="highlight" font-size="160">M</text>
+    <text x="390" y="140" class="highlight" font-size="160">S</text>
+
+    <!-- Top line -->
+    <text x="180" y="70" class="subtext">organ</text>
+    <text x="500" y="70" class="subtext">tanley</text>
+
+    <!-- Bottom line -->
+    <text x="180" y="120" class="subtext">atching</text>
+    <text x="500" y="120" class="subtext">ystem</text>
+
+  </g>
+</svg> 

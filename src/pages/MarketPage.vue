@@ -473,7 +473,7 @@ async function onSubmit() {
       const avgExecutedPrice = weightedTotal / totalQuantity;
 
       addTradeMessage(
-        `Trade executed: ${totalQuantity} shares at $${avgExecutedPrice.toFixed(2)}`,
+        `Trade, price: ${totalQuantity}, qty: $${avgExecutedPrice.toFixed(2)}`,
         'match'
       );
     }
@@ -571,7 +571,7 @@ async function saveEdit() {
         const avgExecutedPrice = weightedTotal / totalQuantity;
 
         addTradeMessage(
-          `Trade executed: ${totalQuantity} shares at $${avgExecutedPrice.toFixed(2)}`,
+          `Trade, price: ${avgExecutedPrice.toFixed(2)}, qty: ${totalQuantity}`,
           'match'
         );
       } else {

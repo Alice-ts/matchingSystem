@@ -73,13 +73,14 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order | null } {
   let hasMatches = true;
   let result = { matched: false, order: null as Order | null };
+  let matchedOrders = new Set<number>();
 
   while (hasMatches) {
     hasMatches = false;
     
     // Only look at orders that have remaining quantity to fill
     const buyOrders = ordersToMatch
-      .filter(o => o.side === 'BUY' && o.quantity > o.filledQuantity)
+      .filter(o => o.side === 'BUY' && o.quantity > o.filledQuantity && !matchedOrders.has(o.id))
       .sort((a, b) => {
         // First sort by price (highest first for buy orders)
         const priceDiff = b.price - a.price;
@@ -88,7 +89,7 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
       });
     
     const sellOrders = ordersToMatch
-      .filter(o => o.side === 'SELL' && o.quantity > o.filledQuantity)
+      .filter(o => o.side === 'SELL' && o.quantity > o.filledQuantity && !matchedOrders.has(o.id))
       .sort((a, b) => {
         // First sort by price (lowest first for sell orders)
         const priceDiff = a.price - b.price;
@@ -108,7 +109,8 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
       // Find matching sell orders with favorable prices
       const matchingSellOrders = sellOrders.filter(sellOrder => 
         sellOrder.price <= buyOrder.price && 
-        (sellOrder.quantity - sellOrder.filledQuantity) > 0
+        (sellOrder.quantity - sellOrder.filledQuantity) > 0 &&
+        !matchedOrders.has(sellOrder.id)
       );
 
       if (matchingSellOrders.length === 0) continue;
@@ -136,6 +138,10 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
           executedPrice
         };
         trades.push(newTrade);
+
+        // Mark both orders as matched to prevent duplicate matches
+        matchedOrders.add(buyOrder.id);
+        matchedOrders.add(sellOrder.id);
 
         // Update both orders
         ordersToMatch = ordersToMatch.map(o => {
@@ -179,21 +185,21 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
     }
 
     // Handle market sell orders
-    const marketSellOrder = sellOrders.find(o => o.type === 'MARKET');
+    const marketSellOrder = sellOrders.find(o => o.type === 'MARKET' && !matchedOrders.has(o.id));
     if (marketSellOrder) {
       let totalMatchedQuantity = 0;
       let weightedPrice = 0;
-      let remainingQuantity = marketSellOrder.quantity;
+      let remainingQuantity = marketSellOrder.quantity - marketSellOrder.filledQuantity;
 
       // Match against buy orders until fully filled or no more matches
       for (const buyOrderToMatch of buyOrders) {
         if (remainingQuantity <= 0) break;
         
-        // Skip orders with invalid prices
-        if (buyOrderToMatch.price <= 0) continue;
+        // Skip orders with invalid prices or already matched
+        if (buyOrderToMatch.price <= 0 || matchedOrders.has(buyOrderToMatch.id)) continue;
 
         // Calculate available quantity for this match
-        const availableToBuy = buyOrderToMatch.quantity - (buyOrderToMatch.filledQuantity || 0);
+        const availableToBuy = buyOrderToMatch.quantity - buyOrderToMatch.filledQuantity;
         if (availableToBuy <= 0) continue;
 
         // Match as much as we can with this order
@@ -209,10 +215,14 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
         };
         trades.push(newTrade);
 
+        // Mark both orders as matched
+        matchedOrders.add(marketSellOrder.id);
+        matchedOrders.add(buyOrderToMatch.id);
+
         // Update both orders
         ordersToMatch = ordersToMatch.map(o => {
           if (o.id === buyOrderToMatch.id) {
-            const newFilledQuantity = (o.filledQuantity || 0) + matchQuantity;
+            const newFilledQuantity = o.filledQuantity + matchQuantity;
             return {
               ...o,
               filledQuantity: newFilledQuantity,
@@ -221,7 +231,7 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
             };
           }
           if (o.id === marketSellOrder.id) {
-            const newFilledQuantity = (o.filledQuantity || 0) + matchQuantity;
+            const newFilledQuantity = o.filledQuantity + matchQuantity;
             return {
               ...o,
               filledQuantity: newFilledQuantity,
@@ -338,7 +348,10 @@ export const mockApi = {
         let totalMatchedQuantity = 0;
 
         for (const sellOrder of sortedSellOrders) {
-          const matchQuantity = Math.min(remainingQuantity, sellOrder.quantity);
+          const availableToSell = sellOrder.quantity - sellOrder.filledQuantity;
+          if (availableToSell <= 0) continue;
+          
+          const matchQuantity = Math.min(remainingQuantity, availableToSell);
           weightedPrice += sellOrder.price * matchQuantity;
           totalMatchedQuantity += matchQuantity;
           remainingQuantity -= matchQuantity;
@@ -358,7 +371,10 @@ export const mockApi = {
         let totalMatchedQuantity = 0;
 
         for (const buyOrder of sortedBuyOrders) {
-          const matchQuantity = Math.min(remainingQuantity, buyOrder.quantity);
+          const availableToBuy = buyOrder.quantity - buyOrder.filledQuantity;
+          if (availableToBuy <= 0) continue;
+          
+          const matchQuantity = Math.min(remainingQuantity, availableToBuy);
           weightedPrice += buyOrder.price * matchQuantity;
           totalMatchedQuantity += matchQuantity;
           remainingQuantity -= matchQuantity;
@@ -390,7 +406,7 @@ export const mockApi = {
     console.log('Updating order:', updatedOrder);
     orders = orders.map(o => o.id === id ? updatedOrder : o);
 
-    console.log('Checking for matches...');
+    // Only match orders once
     const result = matchOrders(orders);
     console.log('Matching result:', result);
 

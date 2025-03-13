@@ -100,82 +100,85 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
       break;
     }
 
+    // Check for limit order matches
     for (const buyOrder of buyOrders) {
       const remainingToBuy = buyOrder.quantity - buyOrder.filledQuantity;
       if (remainingToBuy <= 0) continue;
 
-      if (buyOrder.type === 'MARKET') {
-        let totalMatchedQuantity = 0;
-        let weightedPrice = 0;
-        let remainingQuantity = buyOrder.quantity;
+      // Find matching sell orders with favorable prices
+      const matchingSellOrders = sellOrders.filter(sellOrder => 
+        sellOrder.price <= buyOrder.price && 
+        (sellOrder.quantity - sellOrder.filledQuantity) > 0
+      );
 
-        // Match against sell orders until fully filled or no more matches
-        for (const sellOrder of sellOrders) {
-          if (remainingQuantity <= 0) break;
-          
-          // Skip orders with invalid prices
-          if (sellOrder.price <= 0) continue;
+      if (matchingSellOrders.length === 0) continue;
 
-          // Calculate available quantity for this match
-          const availableToSell = sellOrder.quantity - sellOrder.filledQuantity;
-          if (availableToSell <= 0) continue;
+      let totalMatchedQuantity = 0;
+      let weightedPrice = 0;
+      let remainingQuantity = remainingToBuy;
 
-          // Match as much as we can with this order
-          const matchQuantity = Math.min(remainingQuantity, availableToSell);
-          const executedPrice = sellOrder.price;
+      // Match against sell orders until fully filled or no more matches
+      for (const sellOrder of matchingSellOrders) {
+        if (remainingQuantity <= 0) break;
+        
+        const availableToSell = sellOrder.quantity - sellOrder.filledQuantity;
+        if (availableToSell <= 0) continue;
 
-          // Create and record the trade
-          const newTrade: Trade = {
-            buyId: buyOrder.id,
-            sellId: sellOrder.id,
-            quantity: matchQuantity,
-            executedPrice
-          };
-          trades.push(newTrade);
+        // Match as much as we can with this order
+        const matchQuantity = Math.min(remainingQuantity, availableToSell);
+        const executedPrice = sellOrder.price;
 
-          // Update both orders
-          ordersToMatch = ordersToMatch.map(o => {
-            if (o.id === sellOrder.id) {
-              return {
-                ...o,
-                filledQuantity: o.filledQuantity + matchQuantity,
-                executedPrice: executedPrice
-              };
-            }
-            if (o.id === buyOrder.id) {
-              return {
-                ...o,
-                filledQuantity: o.filledQuantity + matchQuantity,
-                executedPrice: executedPrice
-              };
-            }
-            return o;
-          });
+        // Create and record the trade
+        const newTrade: Trade = {
+          buyId: buyOrder.id,
+          sellId: sellOrder.id,
+          quantity: matchQuantity,
+          executedPrice
+        };
+        trades.push(newTrade);
 
-          // Update running totals
-          weightedPrice += executedPrice * matchQuantity;
-          totalMatchedQuantity += matchQuantity;
-          remainingQuantity -= matchQuantity;
-        }
+        // Update both orders
+        ordersToMatch = ordersToMatch.map(o => {
+          if (o.id === sellOrder.id) {
+            return {
+              ...o,
+              filledQuantity: o.filledQuantity + matchQuantity,
+              executedPrice: executedPrice
+            };
+          }
+          if (o.id === buyOrder.id) {
+            return {
+              ...o,
+              filledQuantity: o.filledQuantity + matchQuantity,
+              executedPrice: executedPrice
+            };
+          }
+          return o;
+        });
 
-        // If we matched anything, record the result
-        if (totalMatchedQuantity > 0) {
-          const avgExecutedPrice = weightedPrice / totalMatchedQuantity;
-          result = {
-            matched: true,
-            order: {
-              ...buyOrder,
-              quantity: buyOrder.quantity,
-              filledQuantity: totalMatchedQuantity,
-              executedPrice: avgExecutedPrice
-            }
-          };
-          hasMatches = true;
-        }
+        // Update running totals
+        weightedPrice += executedPrice * matchQuantity;
+        totalMatchedQuantity += matchQuantity;
+        remainingQuantity -= matchQuantity;
+      }
+
+      // If we matched anything, record the result
+      if (totalMatchedQuantity > 0) {
+        const avgExecutedPrice = weightedPrice / totalMatchedQuantity;
+        result = {
+          matched: true,
+          order: {
+            ...buyOrder,
+            quantity: buyOrder.quantity,
+            filledQuantity: totalMatchedQuantity,
+            executedPrice: avgExecutedPrice
+          }
+        };
+        hasMatches = true;
       }
     }
 
-    // Handle market sell orders outside the buy order loop
+    // Handle market sell orders
     const marketSellOrder = sellOrders.find(o => o.type === 'MARKET');
     if (marketSellOrder) {
       let totalMatchedQuantity = 0;

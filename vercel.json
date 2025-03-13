@@ -1,0 +1,11 @@
+{
+  "buildCommand": "quasar build",
+  "outputDirectory": "dist/spa",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+} 

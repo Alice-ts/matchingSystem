@@ -46,7 +46,7 @@ export default defineConfig((/* ctx */) => {
         // extendTsConfig (tsConfig) {}
       },
 
-      vueRouterMode: 'hash', // available values: 'hash', 'history'
+      vueRouterMode: 'history', // change from 'hash' to 'history'
       // vueRouterBase,
       // vueDevtools,
       // vueOptionsAPI: false,

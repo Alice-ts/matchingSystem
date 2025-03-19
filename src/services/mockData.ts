@@ -102,8 +102,8 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
     }
 
     // First handle market orders
-    const marketBuyOrder = buyOrders.find(o => o.type === 'MARKET' && !matchedOrders.has(o.id));
-    const marketSellOrder = sellOrders.find(o => o.type === 'MARKET' && !matchedOrders.has(o.id));
+    const marketBuyOrder = buyOrders.find(o => o.type === 'MARKET');
+    const marketSellOrder = sellOrders.find(o => o.type === 'MARKET');
 
     if (marketBuyOrder) {
       let totalMatchedQuantity = 0;
@@ -112,7 +112,8 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
 
       // Match against sell orders until fully filled or no more matches
       for (const sellOrder of sellOrders) {
-        if (remainingQuantity <= 0 || matchedOrders.has(sellOrder.id)) break;
+        if (remainingQuantity <= 0) break;
+        if (matchedOrders.has(sellOrder.id)) continue;
         
         const availableToSell = sellOrder.quantity - sellOrder.filledQuantity;
         if (availableToSell <= 0) continue;
@@ -130,24 +131,30 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
         };
         trades.push(newTrade);
 
-        // Mark both orders as matched
-        matchedOrders.add(marketBuyOrder.id);
-        matchedOrders.add(sellOrder.id);
+        // Only mark orders as matched if they are completely filled
+        if (sellOrder.filledQuantity + matchQuantity >= sellOrder.quantity) {
+          matchedOrders.add(sellOrder.id);
+        }
+        if (marketBuyOrder.filledQuantity + matchQuantity >= marketBuyOrder.quantity) {
+          matchedOrders.add(marketBuyOrder.id);
+        }
 
         // Update both orders
         ordersToMatch = ordersToMatch.map(o => {
           if (o.id === sellOrder.id) {
+            const newFilledQty = o.filledQuantity + matchQuantity;
             return {
               ...o,
-              filledQuantity: o.filledQuantity + matchQuantity,
-              executedPrice: executedPrice
+              filledQuantity: newFilledQty,
+              executedPrice: newFilledQty === o.quantity ? executedPrice : undefined
             };
           }
           if (o.id === marketBuyOrder.id) {
+            const newFilledQty = o.filledQuantity + matchQuantity;
             return {
               ...o,
-              filledQuantity: o.filledQuantity + matchQuantity,
-              executedPrice: executedPrice
+              filledQuantity: newFilledQty,
+              executedPrice: newFilledQty === o.quantity ? executedPrice : undefined
             };
           }
           return o;
@@ -157,6 +164,7 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
         weightedPrice += executedPrice * matchQuantity;
         totalMatchedQuantity += matchQuantity;
         remainingQuantity -= matchQuantity;
+        hasMatches = true;
       }
 
       // If we matched anything, record the result
@@ -167,11 +175,10 @@ function matchOrders(ordersToMatch: Order[]): { matched: boolean; order: Order |
           order: {
             ...marketBuyOrder,
             quantity: marketBuyOrder.quantity,
-            filledQuantity: totalMatchedQuantity,
-            executedPrice: totalMatchedQuantity === marketBuyOrder.quantity ? avgExecutedPrice : undefined
+            filledQuantity: marketBuyOrder.filledQuantity + totalMatchedQuantity,
+            executedPrice: (marketBuyOrder.filledQuantity + totalMatchedQuantity) === marketBuyOrder.quantity ? avgExecutedPrice : undefined
           }
         };
-        hasMatches = true;
       }
     }
 
